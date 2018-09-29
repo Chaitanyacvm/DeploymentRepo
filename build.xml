@@ -1,0 +1,148 @@
+<project name="Sample usage of Salesforce Ant tasks" default="test" basedir="." xmlns:sf="antlib:com.salesforce">
+
+    <property file="build.properties"/>
+    <property environment="env"/> 
+
+    <!-- 
+         Setting default value for username, password and session id properties to empty string 
+         so unset values are treated as empty. Without this, ant expressions such as ${sf.username}
+         will be treated literally.
+    -->
+    <condition property="sf.usernameRetrieve" value=""> <not> <isset property="sf.usernameRetrieve"/> </not> </condition>
+    <condition property="sf.passwordRetrieve" value=""> <not> <isset property="sf.passwordRetrieve"/> </not> </condition>
+    <condition property="sf.serverurlRetrieve" value=""> <not> <isset property="sf.serverurlRetrieve"/> </not> </condition>
+
+    <condition property="sf.usernameDeploy" value=""> <not> <isset property="sf.usernameDeploy"/> </not> </condition>
+    <condition property="sf.passwordDeploy" value=""> <not> <isset property="sf.passwordDeploy"/> </not> </condition>
+    <condition property="sf.serverurlDeploy" value=""> <not> <isset property="sf.serverurlDeploy"/> </not> </condition>
+
+
+    <condition property="sf.metadataRetrieve.root" value=""> <not> <isset property="sf.metadataRetrieve.root"/> </not> </condition>
+    <condition property="sf.componentlistfileRetrieve" value=""> <not> <isset property="sf.componentlistfileRetrieve"/> </not> </condition>
+    <condition property="sf.sessionId" value=""> <not> <isset property="sf.sessionId"/> </not> </condition>
+    
+
+    <taskdef resource="com/salesforce/antlib.xml" uri="antlib:com.salesforce">
+        <classpath>
+            <pathelement location="C:\\salesforce_ant\\ant-salesforce.jar" />        	
+        </classpath>
+    </taskdef>
+	
+
+    <!-- Retrieve an unpackaged set of metadata from your org -->
+    <target name="retrieveUnpackaged">
+      <delete dir="${sf.metadataRetrieve.root}"/>
+      <mkdir dir="${sf.metadataRetrieve.root}"/>
+      <!-- Retrieve the contents into another directory -->
+      <echo message="retrieveUnpackaged for: ${sf.usernameRetrieve} ..." />
+      <sf:retrieve 
+        username="${sf.usernameRetrieve}" 
+        password="${sf.passwordRetrieve}" 
+        sessionId="${sf.sessionId}" 
+        serverurl="${sf.serverurlRetrieve}" 
+        maxPoll="${sf.maxPoll}" 
+        retrieveTarget="${sf.metadataRetrieve.root}" 
+        unpackaged="${sf.componentlistfileRetrieve}"
+      />
+    </target>
+
+
+    <target name="removeUnwantedComponentsInLocal" depends="remove_social_post_from_profiles">
+      <echo message="deleting Unwanted Components from subfolder of ${sf.metadataRetrieve.root}..." />
+      <delete file="${sf.metadataRetrieve.root}\layouts\SocialPost-Social Post Layout.layout"/>
+      <delete file="${sf.metadataRetrieve.root}\layouts\SocialPersona-Social Persona Layout.layout"/>      
+      <delete file="${sf.metadataRetrieve.root}\workflows\Question.workflow"/> 
+      <delete file="${sf.metadataRetrieve.root}\workflows\Reply.workflow"/> 
+      <delete file="${sf.metadataRetrieve.root}\workflows\SocialPost.workflow"/>
+      <delete file="${sf.metadataRetrieve.root}\workflows\SocialPersona.workflow"/>  
+      <delete file="${sf.metadataRetrieve.root}\workflows\ExternalEventMapping.workflow"/>
+
+      <!-- 20170601 change start -->
+      <delete file="${sf.metadataRetrieve.root}\layouts\QuoteLineItem-Quote Line Item Layout.layout"/>  
+      <delete file="${sf.metadataRetrieve.root}\workflows\AssetRelationship.workflow"/>
+      <!-- 20170601 change end -->
+
+    </target>
+
+    <target name="remove_social_post_from_profiles" >
+        <echo message="updating profiles to remove Social-Post references in ${sf.metadataRetrieve.root}..." />
+        <replaceregexp match="^    &lt;layoutAssignments&gt;\n        &lt;layout&gt;SocialPost-Social Post Layout&lt;/layout&gt;\n    &lt;/layoutAssignments&gt;$" replace="" flags="gm" byline="false">
+            <fileset dir="${sf.metadataRetrieve.root}\profiles" includes="**/*.profile" />
+        </replaceregexp>
+    </target>
+
+    <!-- Check Only without deploy the unpackaged set of metadata retrieved with retrieveUnpackaged and run tests in this organization's namespace only-->
+    <target name="validateDeploymentOnlyInTargetOrg"> 
+      <record name=".LOG_validateDeploymentOnlyInTargetOrg.txt" action="start" append="true" />
+      <echo message="------------------------------------------------------------------------------" />
+      <tstamp><format property="TODAY_IT_START" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT"/></tstamp><echo>${TODAY_IT_START}</echo>
+      <echo message="validateDeploymentOnlyInTargetOrg for: ${sf.usernameDeploy} ..." />
+      <sf:deploy 
+        username="${sf.usernameDeploy}" 
+        password="${sf.passwordDeploy}" 
+        sessionId="${sf.sessionId}" 
+        serverurl="${sf.serverurlDeploy}" 
+        maxPoll="${sf.maxPoll}" 
+        pollWaitMillis="${sf.pollWaitMillis}" 
+        deployRoot="${sf.metadataRetrieve.root}" 
+        rollbackOnError="true" 
+        checkOnly="true" 
+        testLevel="${sf.testLevelDeploy}" 
+      />
+      <tstamp><format property="TODAY_IT_END" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT"/></tstamp><echo>${TODAY_IT_END}</echo>
+      <echo message="------------------------------------------------------------------------------" />
+      <record name=".LOG_validateDeploymentOnlyInTargetOrg.txt" action="stop"/>
+    </target>
+
+
+    <!-- Deploy the unpackaged set of metadata retrieved with retrieveUnpackaged and run tests in this organization's namespace only-->
+    <target name="deployUnpackaged">
+      <record name=".LOG_deployUnpackaged.txt" action="start" append="true" />
+      <echo message="------------------------------------------------------------------------------" />
+      <tstamp><format property="TODAY_IT_START" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT"/></tstamp><echo>${TODAY_IT_START}</echo>
+      <echo message="deployUnpackaged for: ${sf.usernameDeploy} ..." />
+      <sf:deploy 
+        username="${sf.usernameDeploy}" 
+        password="${sf.passwordDeploy}" 
+        sessionId="${sf.sessionId}" 
+        serverurl="${sf.serverurlDeploy}" 
+        maxPoll="${sf.maxPoll}" 
+        pollWaitMillis="${sf.pollWaitMillis}" 
+        deployRoot="${sf.metadataRetrieve.root}" 
+        rollbackOnError="true" 
+        testLevel="${sf.testLevelDeploy}" 
+      />
+      <tstamp><format property="TODAY_IT_END" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT"/></tstamp><echo>${TODAY_IT_END}</echo>
+      <echo message="------------------------------------------------------------------------------" />
+      <record name=".LOG_deployUnpackaged.txt" action="stop"/>
+    </target>
+
+
+
+    <!-- Undeploy: destruct components on the organization -->
+    <target name="destructivePackage">
+      <record name=".LOG_destructivePackage.txt" action="start" append="true" />
+      <echo message="------------------------------------------------------------------------------" />
+      <tstamp><format property="TODAY_IT_START" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT"/></tstamp><echo>${TODAY_IT_START}</echo>
+      <echo message="destructivePackage for: ${sf.usernameDestruct} ..." />
+      <sf:deploy 
+        username="${sf.usernameDestruct}" 
+        password="${sf.passwordDestruct}" 
+        sessionId="${sf.sessionId}" 
+        serverurl="${sf.serverurlDestruct}" 
+        maxPoll="${sf.maxPoll}" 
+        pollWaitMillis="${sf.pollWaitMillis}" 
+        deployRoot="${sf.metadataDestruct.root}" 
+        rollbackOnError="true" 
+        testLevel="${sf.testLevelDestruct}" 
+        purgeOnDelete="${sf.purgeOnDeleteDestruct}" 
+        checkOnly="sf.checkOnlyDestruct" 
+      />
+      <tstamp><format property="TODAY_IT_END" pattern="yyyy-MM-dd HH:mm:ss" locale="it,IT"/></tstamp><echo>${TODAY_IT_END}</echo>
+      <echo message="------------------------------------------------------------------------------" />
+      <record name=".LOG_destructivePackage.txt" action="stop"/>
+    </target>
+
+
+
+</project>
